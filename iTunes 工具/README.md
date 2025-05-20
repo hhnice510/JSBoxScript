@@ -14,4 +14,4 @@
 - 增加详细信息、价格变化预览(AppzApp API，需自备 deviceuid，可抓包提取)
 - 增加 Widget 获取分享当前 Music.app 播放音乐(查询顺序：AM->网易云->内置图片纯文字分享)
 
-[Tap to Install](https://xteko.com/redir?name=iTunes%20Utilities&url=https://github.com/hhnice510/JSBoxScript/raw/refs/heads/main/iTunes%20%E5%B7%A5%E5%85%B7.box)
+[Tap to Install](https://xteko.com/redir?name=iTunes%20Utilities&url=https://github.com/hhnice510/JSBoxScript/raw/main/iTunes-Tools/.output/iTunes%20%E5%B7%A5%E5%85%B7.box)

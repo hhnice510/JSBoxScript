@@ -15,7 +15,7 @@
  *    - 原生注入 Referer 防盗链请求头，彻底根治 403 阻断与黑屏
  *    - 【左右画廊翻页模式】（双指平滑无损放大缩放、双击缩放、页码跟随、历史页码恢复）
  *    - 【上下条漫滚动模式】（一键即时无缝切换）
- *    - “上一话 / 下一话” 章节自由切换与进度实时持久化
+ *    - “上一话 / 下一话” 自由切换、话末后台智能预载与末页自动无缝进入下一话
  */
 
 const BASE_URL = "https://tw.manhuagui.com";
@@ -97,24 +97,24 @@ const Storage = {
   KEY_SEARCH: "mh_search_keywords_v2",
   KEY_GENRE_EXPANDED: "mh_genre_expanded_v2",
 
-  isGenreExpanded: function() {
+  isGenreExpanded: function () {
     return $cache.get(this.KEY_GENRE_EXPANDED) || false;
   },
 
-  setGenreExpanded: function(expanded) {
+  setGenreExpanded: function (expanded) {
     $cache.set(this.KEY_GENRE_EXPANDED, expanded);
   },
 
-  getFavorites: function() {
+  getFavorites: function () {
     return $cache.get(this.KEY_FAVORITES) || [];
   },
 
-  isFavorite: function(comicUrl) {
+  isFavorite: function (comicUrl) {
     let list = this.getFavorites();
     return list.some(item => item.url === comicUrl);
   },
 
-  toggleFavorite: function(comic) {
+  toggleFavorite: function (comic) {
     let list = this.getFavorites();
     let idx = list.findIndex(item => item.url === comic.url);
     let isFav = false;
@@ -135,22 +135,22 @@ const Storage = {
     return isFav;
   },
 
-  removeFavorite: function(comicUrl) {
+  removeFavorite: function (comicUrl) {
     let list = this.getFavorites();
     list = list.filter(item => item.url !== comicUrl);
     $cache.set(this.KEY_FAVORITES, list);
   },
 
-  getHistory: function() {
+  getHistory: function () {
     return $cache.get(this.KEY_HISTORY) || [];
   },
 
-  getComicHistory: function(comicUrl) {
+  getComicHistory: function (comicUrl) {
     let list = this.getHistory();
     return list.find(item => item.comicUrl === comicUrl) || null;
   },
 
-  saveHistory: function(entry) {
+  saveHistory: function (entry) {
     let list = this.getHistory();
     let idx = list.findIndex(item => item.comicUrl === entry.comicUrl);
     if (idx !== -1) {
@@ -171,21 +171,21 @@ const Storage = {
     $cache.set(this.KEY_HISTORY, list);
   },
 
-  removeHistory: function(comicUrl) {
+  removeHistory: function (comicUrl) {
     let list = this.getHistory();
     list = list.filter(item => item.comicUrl !== comicUrl);
     $cache.set(this.KEY_HISTORY, list);
   },
 
-  clearHistory: function() {
+  clearHistory: function () {
     $cache.remove(this.KEY_HISTORY);
   },
 
-  getSearchHistory: function() {
+  getSearchHistory: function () {
     return $cache.get(this.KEY_SEARCH) || [];
   },
 
-  addSearchHistory: function(kw) {
+  addSearchHistory: function (kw) {
     if (!kw) return;
     let list = this.getSearchHistory().filter(item => item !== kw);
     list.unshift(kw);
@@ -193,7 +193,7 @@ const Storage = {
     $cache.set(this.KEY_SEARCH, list);
   },
 
-  clearSearchHistory: function() {
+  clearSearchHistory: function () {
     $cache.remove(this.KEY_SEARCH);
   }
 };
@@ -210,7 +210,7 @@ function formatTime(timestamp) {
 
 // ================= 内置 LZString 解密核心 =================
 
-const LZString = (function() {
+const LZString = (function () {
   var f = String.fromCharCode;
   var keyStrBase64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
   var baseReverseDic = {};
@@ -224,14 +224,14 @@ const LZString = (function() {
     return baseReverseDic[alphabet][character];
   }
   return {
-    decompressFromBase64: function(input) {
+    decompressFromBase64: function (input) {
       if (input == null) return "";
       if (input == "") return null;
-      return this._decompress(input.length, 32, function(index) {
+      return this._decompress(input.length, 32, function (index) {
         return getBaseValue(keyStrBase64, input.charAt(index));
       });
     },
-    _decompress: function(length, resetValue, getNextValue) {
+    _decompress: function (length, resetValue, getNextValue) {
       var dictionary = [], next, enlargeIn = 4, dictSize = 4, numBits = 3, entry = "", result = [], i, w, bits, resb, maxpower, power, c, data = { val: getNextValue(0), position: resetValue, index: 1 };
       for (i = 0; i < 3; i += 1) dictionary[i] = i;
       bits = 0; maxpower = Math.pow(2, 2); power = 1;
@@ -295,7 +295,7 @@ const LZString = (function() {
   };
 })();
 
-String.prototype.splic = function(f) {
+String.prototype.splic = function (f) {
   return LZString.decompressFromBase64(this.toString()).split(f);
 };
 
@@ -493,9 +493,9 @@ function decryptImgData(html) {
 
   let capturedData = null;
   const SMH = {
-    imgData: function(data) {
+    imgData: function (data) {
       capturedData = data;
-      return { preInit: function() {} };
+      return { preInit: function () { } };
     }
   };
 
@@ -1364,7 +1364,7 @@ function scrollGenreMatrixToSelected() {
         indexPath: $indexPath(0, idx),
         animated: true
       });
-    } catch (e) {}
+    } catch (e) { }
   }
 }
 
@@ -1678,7 +1678,8 @@ function renderDetailUI(comic) {
 
       // 展开状态下的章节行 (row 1 .. N)
       if (!isCollapsed) {
-        sec.rows.forEach(item => {
+        let displayList = isReverseOrder ? [...sec.rows].reverse() : sec.rows;
+        displayList.forEach(item => {
           let isLastRead = comicHistory && comicHistory.chapterUrl === item.url;
           let tagText = isLastRead ? `读至 P.${comicHistory.page}` : (item.pageCount || "");
           rows.push({
@@ -1746,7 +1747,7 @@ function renderDetailUI(comic) {
         allSections = newComic.sections.map(s => ({
           title: s.title,
           rawTitle: s.rawTitle,
-          rows: isReverseOrder ? [...s.rows].reverse() : [...s.rows],
+          rows: [...s.rows],
           collapsed: !!collapsedMap[s.rawTitle]
         }));
 
@@ -1920,6 +1921,7 @@ function renderDetailUI(comic) {
                   tapped: () => {
                     let target = getFirstOrHistoryChapter();
                     if (target) {
+                      comic.sections = allSections;
                       openReader(comic, target.chapter, target.index, target.allRows, target.page || 1, () => {
                         comicHistory = Storage.getComicHistory(comic.url);
                         reloadChapterList();
@@ -1950,7 +1952,6 @@ function renderDetailUI(comic) {
                   tapped: sender => {
                     isReverseOrder = !isReverseOrder;
                     sender.title = isReverseOrder ? "正序" : "倒序";
-                    allSections.forEach(s => s.rows.reverse());
                     reloadChapterList();
                   }
                 }
@@ -2154,10 +2155,12 @@ function renderDetailUI(comic) {
               return;
             }
 
-            let chapterIndex = indexPath.row - 1;
-            let chapter = section.rows[chapterIndex];
+            let clickedRow = indexPath.row - 1;
+            let realIndex = isReverseOrder ? (section.rows.length - 1 - clickedRow) : clickedRow;
+            let chapter = section.rows[realIndex];
             if (!chapter) return;
-            openReader(comic, chapter, chapterIndex, section.rows, 1, () => {
+            comic.sections = allSections;
+            openReader(comic, chapter, realIndex, section.rows, 1, () => {
               comicHistory = Storage.getComicHistory(comic.url);
               reloadChapterList();
             });
@@ -2436,6 +2439,68 @@ function openReaderDirectly(historyEntry) {
   openReader(comic, chapter, historyEntry.chapterIndex || 0, [], historyEntry.page || 1);
 }
 
+function findAdjacentChapters(comic, currentChapter, chapterIndex, allChapters) {
+  let prev = null;
+  let next = null;
+
+  // 1. 如果有当前章节列表
+  if (allChapters && allChapters.length > 0) {
+    let idx = chapterIndex;
+    if (idx < 0 || idx >= allChapters.length || allChapters[idx].url !== currentChapter.url) {
+      idx = allChapters.findIndex(r => r.url === currentChapter.url);
+    }
+    if (idx !== -1) {
+      if (idx > 0) prev = allChapters[idx - 1];
+      if (idx < allChapters.length - 1) next = allChapters[idx + 1];
+
+      // 跨分组向后查找（例如第一卷读完进入第二卷）
+      if (!next && comic && comic.sections && comic.sections.length > 1) {
+        let secIdx = comic.sections.findIndex(s => s.rows && s.rows.some(r => r.url === currentChapter.url));
+        if (secIdx !== -1 && secIdx < comic.sections.length - 1 && comic.sections[secIdx + 1].rows && comic.sections[secIdx + 1].rows.length > 0) {
+          next = comic.sections[secIdx + 1].rows[0];
+        }
+      }
+
+      // 跨分组向前查找
+      if (!prev && comic && comic.sections && comic.sections.length > 1) {
+        let secIdx = comic.sections.findIndex(s => s.rows && s.rows.some(r => r.url === currentChapter.url));
+        if (secIdx > 0 && comic.sections[secIdx - 1].rows && comic.sections[secIdx - 1].rows.length > 0) {
+          let prevSec = comic.sections[secIdx - 1].rows;
+          prev = prevSec[prevSec.length - 1];
+        }
+      }
+
+      return { prev, next, realIndex: idx, chapters: allChapters };
+    }
+  }
+
+  // 2. 如果 allChapters 为空，但在 comic.sections 中存在
+  if (comic && comic.sections && comic.sections.length > 0) {
+    for (let sIdx = 0; sIdx < comic.sections.length; sIdx++) {
+      let sec = comic.sections[sIdx];
+      let idx = sec.rows.findIndex(r => r.url === currentChapter.url);
+      if (idx !== -1) {
+        if (idx > 0) {
+          prev = sec.rows[idx - 1];
+        } else if (sIdx > 0 && comic.sections[sIdx - 1].rows && comic.sections[sIdx - 1].rows.length > 0) {
+          let prevSec = comic.sections[sIdx - 1].rows;
+          prev = prevSec[prevSec.length - 1];
+        }
+
+        if (idx < sec.rows.length - 1) {
+          next = sec.rows[idx + 1];
+        } else if (sIdx < comic.sections.length - 1 && comic.sections[sIdx + 1].rows && comic.sections[sIdx + 1].rows.length > 0) {
+          next = comic.sections[sIdx + 1].rows[0];
+        }
+
+        return { prev, next, realIndex: idx, chapters: sec.rows };
+      }
+    }
+  }
+
+  return { prev: null, next: null, realIndex: chapterIndex, chapters: allChapters };
+}
+
 function openReader(comic, chapter, chapterIndex = -1, allChapters = [], initialPage = 1, onFinished) {
   $ui.loading(true);
   $http.get({
@@ -2469,25 +2534,38 @@ function openReader(comic, chapter, chapterIndex = -1, allChapters = [], initial
 
 function renderReaderView(comic, chapter, imageUrls, chapterIndex, allChapters, initialPage, onFinished) {
   let isVerticalMode = false;
-  let totalPages = imageUrls.length;
+  let currentChapter = chapter;
+  let currentChapterIndex = chapterIndex;
+  let currentAllChapters = allChapters || [];
+  let currentImageUrls = imageUrls;
+  let totalPages = currentImageUrls.length;
   let currentPage = Math.min(Math.max(initialPage || 1, 1), totalPages);
 
+  // 双向预加载缓存
+  let prefetchNextCache = { url: "", data: null };
+  let prefetchPrevCache = { url: "", data: null };
+
+  let isTransitioning = false;
+  let autoNextTimer = null;
+
+  // 记录阅读进度
   function recordProgress(page) {
     currentPage = page;
     Storage.saveHistory({
       comicUrl: comic.url,
       comicTitle: comic.title,
       comicCover: comic.cover,
-      chapterTitle: chapter.title,
-      chapterUrl: chapter.url,
-      chapterIndex: chapterIndex,
+      chapterTitle: currentChapter.title,
+      chapterUrl: currentChapter.url,
+      chapterIndex: currentChapterIndex,
       page: currentPage,
       totalPages: totalPages
     });
-    $ui.title = `${chapter.title} (${currentPage}/${totalPages})`;
+    $ui.title = `${currentChapter.title} (${currentPage}/${totalPages})`;
     if (onFinished) onFinished();
   }
 
+  // 模式切换（翻页 vs 条漫）
   function switchMode() {
     isVerticalMode = !isVerticalMode;
     let galleryView = $("readerGallery");
@@ -2500,31 +2578,757 @@ function renderReaderView(comic, chapter, imageUrls, chapterIndex, allChapters, 
       if (btnMode) {
         btnMode.title = isVerticalMode ? "翻页模式" : "条漫模式";
       }
+      if (isVerticalMode) {
+        // 同步当前页码到条漫
+        let targetRow = Math.min(Math.max(currentPage - 1, 0), currentImageUrls.length - 1);
+        let doScroll = () => {
+          let list = $("readerList");
+          if (list) {
+            try {
+              list.scrollTo({
+                indexPath: $indexPath(0, targetRow),
+                position: (typeof $scrollPosition !== "undefined" && $scrollPosition.top) ? $scrollPosition.top : 1,
+                animated: false
+              });
+            } catch (e) {
+              list.scrollTo({ indexPath: $indexPath(0, targetRow), animated: false });
+            }
+          }
+        };
+        $delay(0.02, doScroll);
+      } else {
+        // 同步当前页码到翻页画廊 (0-based)
+        galleryView.page = Math.min(Math.max(currentPage - 1, 0), totalPages - 1);
+      }
     }
   }
 
+  // 双向预加载章节数据
+  function prefetchChapter(targetChapter, isPrev = false) {
+    if (!targetChapter || !targetChapter.url) return;
+    let cache = isPrev ? prefetchPrevCache : prefetchNextCache;
+    if (cache.url === targetChapter.url && cache.data) return;
+
+    let targetUrl = targetChapter.url;
+    cache.url = targetUrl;
+    cache.data = null;
+
+    $http.get({
+      url: targetUrl,
+      header: { "User-Agent": UA, "Cookie": "isAdult=1" },
+      handler: resp => {
+        if (resp.data && cache.url === targetUrl) {
+          let data = decryptImgData(resp.data);
+          if (data && data.files && data.files.length > 0) {
+            let path = data.path || "";
+            let e = data.sl ? data.sl.e : "";
+            let m = data.sl ? data.sl.m : "";
+            let urls = data.files.map(file => encodeURI(`${IMG_HOST}${path}${file}`) + `?e=${e}&m=${m}`);
+            cache.data = { chapter: targetChapter, imageUrls: urls };
+          }
+        }
+      }
+    });
+  }
+
+  // 自动触发进入下一话
+  function triggerAutoNext() {
+    if (isTransitioning) return;
+    cancelAutoNext();
+    autoNextTimer = setTimeout(() => {
+      doTransitionToNext();
+    }, 450);
+  }
+
+  function cancelAutoNext() {
+    if (autoNextTimer) {
+      clearTimeout(autoNextTimer);
+      autoNextTimer = null;
+    }
+  }
+
+  // 执行切换到下一话（从第 1 页开始）
+  function doTransitionToNext() {
+    if (isTransitioning) return;
+    cancelAutoNext();
+
+    let adj = findAdjacentChapters(comic, currentChapter, currentChapterIndex, currentAllChapters);
+    let next = adj.next;
+    if (!next) {
+      $ui.toast("已经是最后一话了");
+      return;
+    }
+
+    isTransitioning = true;
+    updateNextTransitionLoadingState(true, next.title);
+
+    // 优先命中预加载缓存
+    if (prefetchNextCache.url === next.url && prefetchNextCache.data) {
+      let cached = prefetchNextCache.data;
+      applyChapter(cached.chapter, cached.imageUrls, adj.realIndex + 1, adj.chapters, 1);
+      return;
+    }
+
+    // 否则直接拉取
+    $http.get({
+      url: next.url,
+      header: { "User-Agent": UA, "Cookie": "isAdult=1" },
+      handler: resp => {
+        if (!resp.data) {
+          isTransitioning = false;
+          updateNextTransitionLoadingState(false, next.title, "网络连接失败，请点击重试");
+          $ui.toast("下一话数据加载失败");
+          return;
+        }
+
+        let data = decryptImgData(resp.data);
+        if (!data || !data.files || data.files.length === 0) {
+          isTransitioning = false;
+          updateNextTransitionLoadingState(false, next.title, "图片解密失败，请点击重试");
+          $ui.toast("图片解密失败");
+          return;
+        }
+
+        let path = data.path || "";
+        let e = data.sl ? data.sl.e : "";
+        let m = data.sl ? data.sl.m : "";
+        let urls = data.files.map(file => encodeURI(`${IMG_HOST}${path}${file}`) + `?e=${e}&m=${m}`);
+
+        applyChapter(next, urls, adj.realIndex + 1, adj.chapters, 1);
+      }
+    });
+  }
+
+  // 执行返回上一话（保证连续性：从上一话最后一页/最底端开始阅读）
+  function doTransitionToPrev() {
+    if (isTransitioning) return;
+    cancelAutoNext();
+
+    let adj = findAdjacentChapters(comic, currentChapter, currentChapterIndex, currentAllChapters);
+    let prev = adj.prev;
+    if (!prev) {
+      $ui.toast("已经是第一话了");
+      return;
+    }
+
+    isTransitioning = true;
+    $ui.loading(true);
+
+    // 优先命中上一话预加载缓存
+    if (prefetchPrevCache.url === prev.url && prefetchPrevCache.data) {
+      $ui.loading(false);
+      let cached = prefetchPrevCache.data;
+      applyChapter(cached.chapter, cached.imageUrls, adj.realIndex - 1, adj.chapters, cached.imageUrls.length);
+      return;
+    }
+
+    // 否则直接拉取
+    $http.get({
+      url: prev.url,
+      header: { "User-Agent": UA, "Cookie": "isAdult=1" },
+      handler: resp => {
+        $ui.loading(false);
+        if (!resp.data) {
+          isTransitioning = false;
+          $ui.toast("上一话数据加载失败");
+          return;
+        }
+
+        let data = decryptImgData(resp.data);
+        if (!data || !data.files || data.files.length === 0) {
+          isTransitioning = false;
+          $ui.toast("图片解密失败");
+          return;
+        }
+
+        let path = data.path || "";
+        let e = data.sl ? data.sl.e : "";
+        let m = data.sl ? data.sl.m : "";
+        let urls = data.files.map(file => encodeURI(`${IMG_HOST}${path}${file}`) + `?e=${e}&m=${m}`);
+
+        // 保证连续性：进入上一话时定位到最后一页 (urls.length)
+        applyChapter(prev, urls, adj.realIndex - 1, adj.chapters, urls.length);
+      }
+    });
+  }
+
+  // 更新下一话过渡页加载状态提示
+  function updateNextTransitionLoadingState(isLoading, nextTitle, errorMsg) {
+    if ($("lblNextTransitionStatus")) {
+      if (errorMsg) {
+        $("lblNextTransitionStatus").text = errorMsg;
+        $("lblNextTransitionStatus").textColor = $color("#e74c3c");
+      } else {
+        $("lblNextTransitionStatus").text = isLoading ? `正在进入: ${nextTitle}...` : `即将自动进入: ${nextTitle}`;
+        $("lblNextTransitionStatus").textColor = $color("#3498db");
+      }
+    }
+    if ($("nextTransitionSpinner")) {
+      $("nextTransitionSpinner").hidden = !isLoading;
+      $("nextTransitionSpinner").loading = isLoading;
+    }
+    if ($("btnNextTransitionAction") && errorMsg) {
+      $("btnNextTransitionAction").title = "重试加载下一话";
+    }
+  }
+
+  // 应用并渲染新章节（保留当前阅读器视图，无缝原地切换）
+  function applyChapter(newChapter, newImageUrls, newChapterIndex, newAllChapters, startPage = 1) {
+    currentChapter = newChapter;
+    currentChapterIndex = newChapterIndex;
+    currentAllChapters = newAllChapters;
+    currentImageUrls = newImageUrls;
+    totalPages = newImageUrls.length;
+    currentPage = Math.min(Math.max(startPage, 1), totalPages);
+    isTransitioning = false;
+
+    let adj = findAdjacentChapters(comic, currentChapter, currentChapterIndex, currentAllChapters);
+    currentChapterIndex = adj.realIndex;
+    currentAllChapters = adj.chapters;
+    let next = adj.next;
+    let prev = adj.prev;
+
+    let newGalleryItems = buildGalleryItems(newImageUrls, newChapter, next);
+    let newListData = buildListData(newImageUrls, newChapter);
+    let galleryPageIndex = currentPage - 1;
+
+    let wrapper = $("readerWrapper");
+    if (wrapper) {
+      let oldG = $("readerGallery");
+      let oldL = $("readerList");
+      if (oldG) oldG.remove();
+      if (oldL) oldL.remove();
+
+      wrapper.add(buildGalleryView(newGalleryItems, galleryPageIndex, isVerticalMode));
+      wrapper.add(buildListView(newListData, prev, next, isVerticalMode));
+
+      // 若定位至末页（如返回上一话时），画廊模式与条漫模式均精准定位至末尾
+      if (currentPage > 1) {
+        $delay(0.05, () => {
+          let g = $("readerGallery");
+          if (g) g.page = galleryPageIndex;
+        });
+
+        let targetRow = Math.min(currentPage - 1, newImageUrls.length - 1);
+        let doScroll = () => {
+          let list = $("readerList");
+          if (list) {
+            try {
+              list.scrollTo({
+                indexPath: $indexPath(0, targetRow),
+                position: (typeof $scrollPosition !== "undefined" && $scrollPosition.bottom) ? $scrollPosition.bottom : 3,
+                animated: false
+              });
+            } catch (e) {
+              list.scrollTo({ indexPath: $indexPath(0, targetRow), animated: false });
+            }
+          }
+        };
+        $delay(0.05, doScroll);
+        $delay(0.15, doScroll);
+      }
+    }
+
+    recordProgress(currentPage);
+
+    // 预加载相邻话数
+    if (next) prefetchChapter(next, false);
+    if (prev) prefetchChapter(prev, true);
+  }
+
+  // 下一话过渡页面视图（置于画廊最后一页）
+  function buildNextTransitionPageView(curChapter, nextChapter, total) {
+    return {
+      type: "view",
+      props: {
+        bgcolor: $color("black")
+      },
+      layout: $layout.fill,
+      views: [
+        {
+          type: "view",
+          props: {
+            id: "nextTransitionCard",
+            bgcolor: $color("#1c1c1e"),
+            radius: 16
+          },
+          layout: (make, view) => {
+            make.center.equalTo(view.super);
+            make.left.right.inset(28);
+            make.height.equalTo(320);
+          },
+          views: [
+            {
+              type: "image",
+              props: {
+                symbol: nextChapter ? "checkmark.circle.fill" : "flag.checkered.circle.fill",
+                tintColor: nextChapter ? $color("#2ecc71") : $color("#f39c12"),
+                contentMode: $contentMode.scaleAspectFit
+              },
+              layout: (make, view) => {
+                make.centerX.equalTo(view.super);
+                make.top.inset(28);
+                make.size.equalTo($size(48, 48));
+              }
+            },
+            {
+              type: "label",
+              props: {
+                text: nextChapter ? "本话阅读完毕" : "全书阅读完毕",
+                font: $font("bold", 18),
+                textColor: $color("#ffffff"),
+                align: $align.center
+              },
+              layout: (make, view) => {
+                make.top.equalTo(view.prev.bottom).offset(14);
+                make.left.right.inset(16);
+              }
+            },
+            {
+              type: "label",
+              props: {
+                text: curChapter.title,
+                font: $font(13),
+                textColor: $color("#888888"),
+                align: $align.center
+              },
+              layout: (make, view) => {
+                make.top.equalTo(view.prev.bottom).offset(6);
+                make.left.right.inset(16);
+              }
+            },
+            {
+              type: "label",
+              props: {
+                id: "lblNextTransitionStatus",
+                text: nextChapter ? `即将自动进入: ${nextChapter.title}` : "已是最新话，作者仍在快马加鞭更新中",
+                font: $font("bold", 14),
+                textColor: nextChapter ? $color("#3498db") : $color("#888888"),
+                align: $align.center,
+                lines: 2
+              },
+              layout: (make, view) => {
+                make.top.equalTo(view.prev.bottom).offset(16);
+                make.left.right.inset(16);
+              }
+            },
+            {
+              type: "spinner",
+              props: {
+                id: "nextTransitionSpinner",
+                loading: !!nextChapter,
+                hidden: !nextChapter,
+                style: 0
+              },
+              layout: (make, view) => {
+                make.top.equalTo(view.prev.bottom).offset(10);
+                make.centerX.equalTo(view.super);
+              }
+            },
+            {
+              type: "button",
+              props: {
+                id: "btnNextTransitionAction",
+                title: nextChapter ? "立即进入下一话 ›" : "返回漫画详情",
+                font: $font("bold", 14),
+                bgcolor: nextChapter ? $color("#3498db") : $color("#333333"),
+                titleColor: $color("#ffffff"),
+                radius: 20
+              },
+              layout: (make, view) => {
+                make.bottom.inset(24);
+                make.left.right.inset(24);
+                make.height.equalTo(42);
+              },
+              events: {
+                tapped: () => {
+                  if (nextChapter) {
+                    doTransitionToNext();
+                  } else {
+                    $ui.pop();
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    };
+  }
+
+  // 构建画廊翻页视图数据：[...正文各页, 下一话过渡页]
+  function buildGalleryItems(urls, curChapter, nextChapter) {
+    let items = [];
+
+    // 1. 漫画正文页 (index 0 .. urls.length - 1)
+    for (let idx = 0; idx < urls.length; idx++) {
+      let pageNum = idx + 1;
+      items.push({
+        type: "scroll",
+        props: {
+          zoomEnabled: true,
+          maxZoomScale: 3,
+          doubleTapToZoom: true,
+          showsHorizontalScrollIndicator: false,
+          showsVerticalScrollIndicator: false,
+          bgcolor: $color("black")
+        },
+        layout: $layout.fill,
+        views: [
+          {
+            type: "label",
+            props: {
+              text: `第 ${pageNum} / ${urls.length} 页`,
+              textColor: $color("#555555"),
+              font: $font(14),
+              align: $align.center
+            },
+            layout: (make, view) => {
+              make.center.equalTo(view.super);
+            }
+          },
+          {
+            type: "image",
+            props: {
+              source: {
+                url: urls[idx],
+                header: {
+                  "User-Agent": UA,
+                  "Referer": curChapter.url || "https://tw.manhuagui.com/"
+                }
+              },
+              contentMode: $contentMode.scaleAspectFit,
+              bgcolor: $color("clear")
+            },
+            layout: $layout.fill
+          }
+        ]
+      });
+    }
+
+    // 2. 下一话过渡页 (index urls.length)
+    items.push(buildNextTransitionPageView(curChapter, nextChapter, urls.length));
+    return items;
+  }
+
+  // 构建画廊控件配置
+  function buildGalleryView(items, startPageIndex, isHidden) {
+    return {
+      type: "gallery",
+      props: {
+        id: "readerGallery",
+        items: items,
+        interval: 0,
+        page: startPageIndex,
+        hidden: isHidden
+      },
+      layout: $layout.fill,
+      events: {
+        changed: sender => {
+          let p = sender.page;
+          if (p === totalPages) {
+            // 翻至最后一页之后：下一话过渡页
+            recordProgress(totalPages);
+            let adj = findAdjacentChapters(comic, currentChapter, currentChapterIndex, currentAllChapters);
+            if (adj.next) {
+              triggerAutoNext();
+            } else {
+              $ui.toast("已经是最后一话了");
+            }
+          } else if (p >= 0 && p < totalPages) {
+            // 正常漫画正文页 (0 <= p < totalPages)
+            cancelAutoNext();
+            recordProgress(p + 1);
+          }
+        }
+      }
+    };
+  }
+
+  // 构建条漫顶部过渡卡片（下拉/上滑返回上一话）
+  function buildListHeader(prevChapter) {
+    return {
+      type: "view",
+      props: {
+        height: 160,
+        bgcolor: $color("black")
+      },
+      views: [
+        {
+          type: "view",
+          props: {
+            bgcolor: $color("#1c1c1e"),
+            radius: 12
+          },
+          layout: (make, view) => {
+            make.left.right.inset(16);
+            make.top.inset(14);
+            make.bottom.inset(14);
+          },
+          views: [
+            {
+              type: "label",
+              props: {
+                text: "本话开始 · 到顶了",
+                font: $font("bold", 15),
+                textColor: $color("#ffffff"),
+                align: $align.center
+              },
+              layout: (make, view) => {
+                make.top.inset(16);
+                make.centerX.equalTo(view.super);
+              }
+            },
+            {
+              type: "label",
+              props: {
+                text: prevChapter ? `继续下拉/上滑拉动返回上一话: ${prevChapter.title}` : "已是第一话，前面没有更多章节",
+                font: $font(13),
+                textColor: prevChapter ? $color("#3498db") : $color("#888888"),
+                align: $align.center
+              },
+              layout: (make, view) => {
+                make.top.equalTo(view.prev.bottom).offset(8);
+                make.left.right.inset(16);
+              }
+            },
+            {
+              type: "button",
+              props: {
+                title: prevChapter ? "立即返回上一话 ‹" : "已是第一话",
+                font: $font("bold", 13),
+                bgcolor: prevChapter ? $color("#2c3e50") : $color("#222222"),
+                titleColor: prevChapter ? $color("#ffffff") : $color("#666666"),
+                radius: 17
+              },
+              layout: (make, view) => {
+                make.bottom.inset(14);
+                make.centerX.equalTo(view.super);
+                make.width.equalTo(180);
+                make.height.equalTo(34);
+              },
+              events: {
+                tapped: () => {
+                  if (prevChapter) {
+                    doTransitionToPrev();
+                  } else {
+                    $ui.toast("已经是第一话了");
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    };
+  }
+
+  // 构建条漫底部过渡卡片（触底/上滑进入下一话）
+  function buildListFooter(nextChapter) {
+    return {
+      type: "view",
+      props: {
+        height: 180,
+        bgcolor: $color("black")
+      },
+      views: [
+        {
+          type: "view",
+          props: {
+            bgcolor: $color("#1c1c1e"),
+            radius: 12
+          },
+          layout: (make, view) => {
+            make.left.right.inset(16);
+            make.top.inset(16);
+            make.bottom.inset(16);
+          },
+          views: [
+            {
+              type: "label",
+              props: {
+                text: "本话阅读完毕",
+                font: $font("bold", 15),
+                textColor: $color("#ffffff"),
+                align: $align.center
+              },
+              layout: (make, view) => {
+                make.top.inset(16);
+                make.centerX.equalTo(view.super);
+              }
+            },
+            {
+              type: "label",
+              props: {
+                text: nextChapter ? `继续上滑或点击进入: ${nextChapter.title}` : "已读至全书最新话，暂无更多章节",
+                font: $font(13),
+                textColor: nextChapter ? $color("#3498db") : $color("#888888"),
+                align: $align.center
+              },
+              layout: (make, view) => {
+                make.top.equalTo(view.prev.bottom).offset(8);
+                make.left.right.inset(16);
+              }
+            },
+            {
+              type: "button",
+              props: {
+                title: nextChapter ? "立即进入下一话 ›" : "返回漫画详情",
+                font: $font("bold", 13),
+                bgcolor: nextChapter ? $color("#3498db") : $color("#333333"),
+                titleColor: $color("#ffffff"),
+                radius: 17
+              },
+              layout: (make, view) => {
+                make.bottom.inset(14);
+                make.centerX.equalTo(view.super);
+                make.width.equalTo(180);
+                make.height.equalTo(34);
+              },
+              events: {
+                tapped: () => {
+                  if (nextChapter) {
+                    doTransitionToNext();
+                  } else {
+                    $ui.pop();
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    };
+  }
+
+  // 构建条漫数据
+  function buildListData(urls, curChapter) {
+    return urls.map((url, idx) => ({
+      lblPage: { text: `第 ${idx + 1} / ${urls.length} 页` },
+      comicImg: {
+        source: {
+          url: url,
+          header: {
+            "User-Agent": UA,
+            "Referer": curChapter.url || "https://tw.manhuagui.com/"
+          }
+        }
+      }
+    }));
+  }
+
+  // 构建条漫控件配置
+  function buildListView(listData, prevChapter, nextChapter, isHidden) {
+    return {
+      type: "list",
+      props: {
+        id: "readerList",
+        hidden: !isHidden,
+        bgcolor: $color("black"),
+        separatorHidden: true,
+        pullToRefresh: true,
+        rowHeight: $device.info.screen.width * 1.42,
+        template: {
+          props: { bgcolor: $color("black") },
+          views: [
+            {
+              type: "label",
+              props: {
+                id: "lblPage",
+                textColor: $color("#555555"),
+                font: $font(13),
+                align: $align.center
+              },
+              layout: (make, view) => {
+                make.center.equalTo(view.super);
+              }
+            },
+            {
+              type: "image",
+              props: {
+                id: "comicImg",
+                contentMode: $contentMode.scaleAspectFit,
+                bgcolor: $color("clear")
+              },
+              layout: $layout.fill
+            }
+          ]
+        },
+        header: buildListHeader(prevChapter),
+        footer: buildListFooter(nextChapter),
+        data: listData
+      },
+      layout: $layout.fill,
+      events: {
+        didScroll: sender => {
+          let offsetY = sender.contentOffset.y;
+          let rowHeight = $device.info.screen.width * 1.42;
+          let headerH = 160;
+          if (offsetY >= 0) {
+            let rowIndex = Math.floor((offsetY - headerH + rowHeight * 0.5) / rowHeight);
+            let page = Math.min(Math.max(rowIndex + 1, 1), totalPages);
+            if (page !== currentPage) {
+              currentPage = page;
+              $ui.title = `${currentChapter.title} (${currentPage}/${totalPages})`;
+              Storage.saveHistory({
+                comicUrl: comic.url,
+                comicTitle: comic.title,
+                comicCover: comic.cover,
+                chapterTitle: currentChapter.title,
+                chapterUrl: currentChapter.url,
+                chapterIndex: currentChapterIndex,
+                page: currentPage,
+                totalPages: totalPages
+              });
+              if (onFinished) onFinished();
+            }
+          }
+        },
+        pulled: sender => {
+          sender.endRefreshing();
+          let adj = findAdjacentChapters(comic, currentChapter, currentChapterIndex, currentAllChapters);
+          if (adj.prev) {
+            doTransitionToPrev();
+          } else {
+            $ui.toast("已经是第一话了");
+          }
+        },
+        didReachBottom: sender => {
+          sender.endFetchingMore();
+          let adj = findAdjacentChapters(comic, currentChapter, currentChapterIndex, currentAllChapters);
+          if (adj.next) {
+            doTransitionToNext();
+          } else {
+            $ui.toast("已经是最后一话了");
+          }
+        }
+      }
+    };
+  }
+
+  // 选话菜单弹窗
   function showChapterMenu() {
+    let adj = findAdjacentChapters(comic, currentChapter, currentChapterIndex, currentAllChapters);
     let actions = [];
-    if (chapterIndex > 0 && allChapters && allChapters[chapterIndex - 1]) {
-      let prev = allChapters[chapterIndex - 1];
+
+    if (adj.prev) {
       actions.push({
-        title: `上一话: ${prev.title}`,
+        title: `上一话: ${adj.prev.title}`,
         handler: () => {
-          $ui.pop();
-          openReader(comic, prev, chapterIndex - 1, allChapters, 1, onFinished);
+          switchToSpecificChapter(adj.prev, adj.realIndex - 1, adj.chapters, true);
         }
       });
     }
-    if (chapterIndex >= 0 && allChapters && chapterIndex < allChapters.length - 1 && allChapters[chapterIndex + 1]) {
-      let next = allChapters[chapterIndex + 1];
+
+    if (adj.next) {
       actions.push({
-        title: `下一话: ${next.title}`,
+        title: `下一话: ${adj.next.title}`,
         handler: () => {
-          $ui.pop();
-          openReader(comic, next, chapterIndex + 1, allChapters, 1, onFinished);
+          switchToSpecificChapter(adj.next, adj.realIndex + 1, adj.chapters, false);
         }
       });
     }
+
     actions.push({
       title: "取消",
       style: "Cancel"
@@ -2532,147 +3336,160 @@ function renderReaderView(comic, chapter, imageUrls, chapterIndex, allChapters, 
 
     $ui.action({
       title: "切换章节",
-      message: `${comic.title} · ${chapter.title}`,
+      message: `${comic.title} · 当前: ${currentChapter.title}`,
       actions: actions
     });
   }
 
-  let galleryItems = imageUrls.map((url, idx) => ({
-    type: "scroll",
-    props: {
-      zoomEnabled: true,
-      maxZoomScale: 3,
-      doubleTapToZoom: true,
-      showsHorizontalScrollIndicator: false,
-      showsVerticalScrollIndicator: false,
-      bgcolor: $color("black")
-    },
-    layout: $layout.fill,
-    views: [
-      {
-        type: "label",
-        props: {
-          text: `第 ${idx + 1} / ${totalPages} 页`,
-          textColor: $color("#555555"),
-          font: $font(14),
-          align: $align.center
-        },
-        layout: (make, view) => {
-          make.center.equalTo(view.super);
+  // 通过菜单跳转指定章节（isPrev 为真时自动定位到最后一页）
+  function switchToSpecificChapter(targetChapter, targetIndex, targetChapters, isPrev = false) {
+    $ui.loading(true);
+    $http.get({
+      url: targetChapter.url,
+      header: { "User-Agent": UA, "Cookie": "isAdult=1" },
+      handler: resp => {
+        $ui.loading(false);
+        if (!resp.data) {
+          $ui.error("章节数据加载失败");
+          return;
         }
-      },
-      {
-        type: "image",
-        props: {
-          source: {
-            url: url,
-            header: {
-              "User-Agent": UA,
-              "Referer": chapter.url || "https://tw.manhuagui.com/"
-            }
-          },
-          contentMode: $contentMode.scaleAspectFit,
-          bgcolor: $color("clear")
-        },
-        layout: $layout.fill
+        let data = decryptImgData(resp.data);
+        if (!data || !data.files || data.files.length === 0) {
+          $ui.error("图片解密失败");
+          return;
+        }
+        let path = data.path || "";
+        let e = data.sl ? data.sl.e : "";
+        let m = data.sl ? data.sl.m : "";
+        let urls = data.files.map(file => encodeURI(`${IMG_HOST}${path}${file}`) + `?e=${e}&m=${m}`);
+        let startPage = isPrev ? urls.length : 1;
+        applyChapter(targetChapter, urls, targetIndex, targetChapters, startPage);
       }
-    ]
-  }));
+    });
+  }
 
-  let listData = imageUrls.map((url, idx) => ({
-    lblPage: { text: `第 ${idx + 1} / ${totalPages} 页` },
-    comicImg: {
-      source: {
-        url: url,
-        header: {
-          "User-Agent": UA,
-          "Referer": chapter.url || "https://tw.manhuagui.com/"
+  // 配置阅读器手势（画廊模式下上滑回到上一话）
+  function setupReaderGestures() {
+    let wrapper = $("readerWrapper");
+    if (!wrapper) return;
+    try {
+      let dirUp = (typeof $swipeGestureDirection !== "undefined" && $swipeGestureDirection.up) ? $swipeGestureDirection.up : 4;
+      wrapper.addGesture({
+        type: "swipe",
+        direction: dirUp,
+        handler: () => {
+          if (isVerticalMode) return;
+          let adj = findAdjacentChapters(comic, currentChapter, currentChapterIndex, currentAllChapters);
+          if (adj.prev) {
+            $ui.toast(`上滑返回上一话: ${adj.prev.title}`);
+            doTransitionToPrev();
+          } else {
+            $ui.toast("已经是第一话了");
+          }
         }
-      }
+      });
+    } catch (e) {
+      console.log("setupReaderGestures error:", e);
     }
-  }));
+  }
+
+  // 初始相邻章节解析
+  let initAdj = findAdjacentChapters(comic, currentChapter, currentChapterIndex, currentAllChapters);
+  currentChapterIndex = initAdj.realIndex;
+  currentAllChapters = initAdj.chapters;
+  let nextChapter = initAdj.next;
+  let prevChapter = initAdj.prev;
+
+  let galleryItems = buildGalleryItems(currentImageUrls, currentChapter, nextChapter);
+  let listData = buildListData(currentImageUrls, currentChapter);
+  let galleryPageIndex = currentPage - 1;
 
   let navButtons = [
     {
       title: "条漫模式",
       id: "btnMode",
       handler: () => switchMode()
+    },
+    {
+      title: "选话",
+      handler: () => showChapterMenu()
     }
   ];
 
-  if (allChapters && allChapters.length > 1) {
-    navButtons.push({
-      title: "选话",
-      handler: () => showChapterMenu()
-    });
-  }
-
   $ui.push({
     props: {
-      title: `${chapter.title} (${currentPage}/${totalPages})`,
+      id: "readerContainer",
+      title: `${currentChapter.title} (${currentPage}/${totalPages})`,
       bgcolor: $color("black"),
       navButtons: navButtons
     },
     views: [
       {
-        type: "gallery",
+        type: "view",
         props: {
-          id: "readerGallery",
-          items: galleryItems,
-          interval: 0,
-          page: currentPage - 1
+          id: "readerWrapper"
         },
         layout: $layout.fill,
-        events: {
-          changed: sender => {
-            recordProgress(sender.page + 1);
-          }
-        }
-      },
-      {
-        type: "list",
-        props: {
-          id: "readerList",
-          hidden: true,
-          bgcolor: $color("black"),
-          separatorHidden: true,
-          rowHeight: $device.info.screen.width * 1.42,
-          template: {
-            props: {
-              bgcolor: $color("black")
-            },
-            views: [
-              {
-                type: "label",
-                props: {
-                  id: "lblPage",
-                  textColor: $color("#555555"),
-                  font: $font(13),
-                  align: $align.center
-                },
-                layout: (make, view) => {
-                  make.center.equalTo(view.super);
-                }
-              },
-              {
-                type: "image",
-                props: {
-                  id: "comicImg",
-                  contentMode: $contentMode.scaleAspectFit,
-                  bgcolor: $color("clear")
-                },
-                layout: $layout.fill
-              }
-            ]
-          },
-          data: listData
-        },
-        layout: $layout.fill
+        views: [
+          buildGalleryView(galleryItems, galleryPageIndex, isVerticalMode),
+          buildListView(listData, prevChapter, nextChapter, isVerticalMode)
+        ]
       }
     ]
   });
 
+  setupReaderGestures();
+
+  // 若初始页大于 1（例如恢复历史记录或从后一话回退至末页），画廊与条漫平滑定位
+  if (currentPage > 1) {
+    $delay(0.05, () => {
+      let g = $("readerGallery");
+      if (g) g.page = galleryPageIndex;
+    });
+
+    let targetRow = Math.min(currentPage - 1, currentImageUrls.length - 1);
+    let doScroll = () => {
+      let list = $("readerList");
+      if (list) {
+        try {
+          list.scrollTo({
+            indexPath: $indexPath(0, targetRow),
+            position: (typeof $scrollPosition !== "undefined" && $scrollPosition.bottom) ? $scrollPosition.bottom : 3,
+            animated: false
+          });
+        } catch (e) {
+          list.scrollTo({ indexPath: $indexPath(0, targetRow), animated: false });
+        }
+      }
+    };
+    $delay(0.05, doScroll);
+    $delay(0.15, doScroll);
+  }
+
   recordProgress(currentPage);
+
+  // 启动预加载上一话与下一话
+  if (nextChapter) prefetchChapter(nextChapter, false);
+  if (prevChapter) prefetchChapter(prevChapter, true);
+
+  // 如果没有全章节列表（如从历史记录直接进入），后台拉取漫画详情补齐章节表并预加载
+  if ((!currentAllChapters || currentAllChapters.length === 0) && comic.url) {
+    $http.get({
+      url: comic.url,
+      header: { "User-Agent": UA, "Cookie": "isAdult=1" },
+      handler: resp => {
+        if (resp.data) {
+          let detail = parseComicDetail(resp.data, comic.url);
+          comic.sections = detail.sections;
+          let newAdj = findAdjacentChapters(comic, currentChapter, currentChapterIndex, []);
+          currentChapterIndex = newAdj.realIndex;
+          currentAllChapters = newAdj.chapters;
+          if (newAdj.next) prefetchChapter(newAdj.next, false);
+          if (newAdj.prev) prefetchChapter(newAdj.prev, true);
+        }
+      }
+    });
+  }
 }
 
 // ================= 启动入口 =================
